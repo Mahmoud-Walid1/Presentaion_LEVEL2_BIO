@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: './', // يدعم العمل على GitHub Pages وأي استضافة فرعية بدون أخطاء المسارات
+  base: '/Presentaion_LEVEL2_BIO/', // المسار المباشر الدقيق لمستودع GitHub Pages
   server: {
     port: 3000,
     open: false,
