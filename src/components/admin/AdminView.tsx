@@ -60,6 +60,7 @@ export const AdminView: React.FC = () => {
       <AdminSlotGrid slots={slots} teams={teams} onReleaseSlot={handleReleaseSlot} />
       <AdminTeamsTable
         teams={teams}
+        slots={slots}
         onEditMember={handleEditMember}
         onDeleteTeam={handleDeleteTeam}
         onReleaseSlot={handleReleaseSlot}

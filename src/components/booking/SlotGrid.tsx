@@ -2,12 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { Search, Filter, Compass, CheckCircle2, Lock } from 'lucide-react';
 import { PresentationSlot } from '../../types/slot';
 import { Team } from '../../types/team';
+import { useApp } from '../../context/AppContext';
 import { SlotCard } from './SlotCard';
 
 interface SlotGridProps {
   slots: PresentationSlot[];
   teams: Team[];
-  mySlotNumber: number | null;
+  mySlotNumber?: number | null;
   canBook: boolean;
   bookingSlotId: number | null;
   onBookSlot: (slotNumber: number) => void;
@@ -16,23 +17,23 @@ interface SlotGridProps {
 export const SlotGrid: React.FC<SlotGridProps> = ({
   slots,
   teams,
-  mySlotNumber,
   canBook,
   bookingSlotId,
   onBookSlot,
 }) => {
+  const { activeTeam } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'available' | 'booked'>('all');
 
   const bookedCount = useMemo(() => {
-    return slots.filter((s) => s.is_booked || teams.some((t) => t.slot_number === s.id)).length;
-  }, [slots, teams]);
+    return slots.filter((s) => s.is_booked || Boolean(s.team_id)).length;
+  }, [slots]);
 
   const availableCount = slots.length - bookedCount;
 
   const filteredSlots = useMemo(() => {
     return slots.filter((slot) => {
-      const isBooked = slot.is_booked || teams.some((t) => t.slot_number === slot.id);
+      const isBooked = slot.is_booked || Boolean(slot.team_id);
       const matchesSearch = slot.title.toLowerCase().includes(searchQuery.trim().toLowerCase());
 
       if (!matchesSearch) return false;
@@ -40,20 +41,20 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
       if (filterMode === 'booked') return isBooked;
       return true;
     });
-  }, [slots, teams, searchQuery, filterMode]);
+  }, [slots, searchQuery, filterMode]);
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Live Stats & Search Bar */}
-      <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
+      <div className="p-4 sm:p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
               <Compass className="w-5 h-5 text-brand-400" />
-              <span>موضوعات العروض التقديمية (30 محمية طبيعية مصرية)</span>
+              <span>موضوعات المحميات الطبيعية (30 محمية)</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              كل فريق يختار محمية واحدة فقط، والحجز لحظي بالأسبقية المباشرة
+              كل فريق يحجز المحميات المسموح له بها، والحجز لحظي بالأسبقية المباشرة
             </p>
           </div>
 
@@ -128,13 +129,17 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredSlots.map((slot) => {
-            const bookedTeam = teams.find((t) => t.slot_number === slot.id);
+            const bookedTeam = teams.find(
+              (t) => t.id === slot.team_id || (t.slot_numbers && t.slot_numbers.includes(slot.id)) || t.slot_number === slot.id
+            );
+            const isMySlot = Boolean(activeTeam && (slot.team_id === activeTeam.id || activeTeam.slot_numbers?.includes(slot.id)));
+
             return (
               <SlotCard
                 key={slot.id}
                 slot={slot}
                 bookedTeam={bookedTeam}
-                isMySlot={mySlotNumber === slot.id}
+                isMySlot={isMySlot}
                 canBook={canBook}
                 isBooking={bookingSlotId === slot.id}
                 onBook={onBookSlot}

@@ -4,6 +4,7 @@ import { Team } from '../types/team';
 import { ActiveTab, ToastMessage } from '../types/state';
 import { getAllSlots } from '../services/slotService';
 import { getAllTeams, getTeamByPin } from '../services/teamService';
+import { getGlobalMaxSlots, setGlobalMaxSlots, setTeamCustomLimit } from '../services/settingsService';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { subscribeToLocalSync } from '../lib/storage';
@@ -16,12 +17,15 @@ interface AppContextValue {
   activeTab: ActiveTab;
   isAdmin: boolean;
   isLoading: boolean;
+  globalMaxSlots: number;
   toast: ToastMessage | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   hideToast: () => void;
   setActiveTeam: (team: Team | null) => void;
   setActiveTab: (tab: ActiveTab) => void;
   setIsAdmin: (status: boolean) => void;
+  updateGlobalMaxSlots: (limit: number) => void;
+  updateTeamMaxSlots: (teamId: string, limit: number | null) => Promise<boolean>;
   refreshData: () => Promise<void>;
   authenticateByPin: (pin: string) => Promise<boolean>;
   logoutTeam: () => void;
@@ -38,6 +42,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) === 'true';
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [globalMaxSlots, setGlobalMaxSlotsState] = useState<number>(() => getGlobalMaxSlots());
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -48,6 +53,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToast(null);
   }, []);
 
+  const updateGlobalMaxSlots = useCallback((limit: number) => {
+    setGlobalMaxSlots(limit);
+    setGlobalMaxSlotsState(limit);
+    showToast(`تم تغيير الحد الأقصى للحجز إلى ${limit} محميات لكل فريق`, 'success');
+  }, [showToast]);
+
+  const updateTeamMaxSlots = useCallback(async (teamId: string, limit: number | null) => {
+    const success = await setTeamCustomLimit(teamId, limit);
+    if (success) {
+      await refreshData();
+      showToast('تم تحديث حد المحميات المخصص للفريق بنجاح', 'success');
+      return true;
+    }
+    showToast('فشل تعديل حد الفريق', 'error');
+    return false;
+  }, [showToast]);
+
   const refreshData = useCallback(async () => {
     try {
       const [fetchedSlots, fetchedTeams] = await Promise.all([
@@ -56,6 +78,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ]);
       setSlots(fetchedSlots);
       setTeams(fetchedTeams);
+      setGlobalMaxSlotsState(getGlobalMaxSlots());
 
       // If active team exists, update its reference
       if (activeTeam) {
@@ -89,7 +112,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_TEAM_PIN);
   };
 
-  // Restore saved team session if any
   useEffect(() => {
     const savedPin = localStorage.getItem(STORAGE_KEYS.ACTIVE_TEAM_PIN);
     if (savedPin) {
@@ -100,12 +122,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time listener: Supabase or Local Broadcast Channel
   useEffect(() => {
-    // 1. Cross-tab local synchronization
-    const unsubLocal = subscribeToLocalSync(() => {
+    const unsubLocal = subscribeToLocalSync((data) => {
+      if (data.type === 'GLOBAL_MAX_SLOTS_UPDATED') {
+        setGlobalMaxSlotsState(data.payload as number);
+      }
       refreshData();
     });
 
-    // 2. Supabase Realtime Channels if configured
     let channel: RealtimeChannel | null = null;
     if (isSupabaseConfigured && supabase) {
       channel = supabase
@@ -146,12 +169,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeTab,
         isAdmin,
         isLoading,
+        globalMaxSlots,
         toast,
         showToast,
         hideToast,
         setActiveTeam,
         setActiveTab,
         setIsAdmin: handleSetIsAdmin,
+        updateGlobalMaxSlots,
+        updateTeamMaxSlots,
         refreshData,
         authenticateByPin,
         logoutTeam,

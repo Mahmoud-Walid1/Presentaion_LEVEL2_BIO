@@ -2,6 +2,7 @@ import { PresentationSlot } from '../types/slot';
 
 export const TOTAL_TEAM_MEMBERS = 7;
 export const TOTAL_SLOTS = 30;
+export const DEFAULT_MAX_SLOTS_PER_TEAM = 2; // افتراضياً كل تيم يحجز محميتين
 
 export const NATURE_RESERVES = [
   'محمية رأس محمد',
@@ -45,8 +46,9 @@ export const INITIAL_SLOTS: PresentationSlot[] = NATURE_RESERVES.map((title, i) 
 }));
 
 export const STORAGE_KEYS = {
-  TEAMS: 'presentation_teams_v2',
-  SLOTS: 'presentation_slots_v2',
+  TEAMS: 'presentation_teams_v3',
+  SLOTS: 'presentation_slots_v3',
+  GLOBAL_MAX_SLOTS: 'global_max_slots_per_team',
   ACTIVE_TEAM_PIN: 'active_team_pin',
   ADMIN_TOKEN: 'admin_authenticated',
 };

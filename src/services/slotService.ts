@@ -2,6 +2,7 @@ import { PresentationSlot, BookingResponse } from '../types/slot';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getStoredSlots, setStoredSlots, getStoredTeams, setStoredTeams } from '../lib/storage';
 import { INITIAL_SLOTS } from '../constants/defaults';
+import { getGlobalMaxSlots } from './settingsService';
 
 export const getAllSlots = async (): Promise<PresentationSlot[]> => {
   if (isSupabaseConfigured && supabase) {
@@ -27,45 +28,87 @@ export const bookSlot = async (
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase.rpc('book_presentation_slot', {
-        p_team_id: teamId,
-        p_slot_number: slotNumber,
-      });
+      // 1. Fetch team info
+      const { data: teamData } = await supabase.from('teams').select('*').eq('id', teamId).single();
+      if (!teamData) {
+        return { success: false, message: 'الفريق غير موجود بالنظام' };
+      }
 
-      if (error) {
-        // Direct fallback query
-        const { count } = await supabase
-          .from('teams')
-          .select('*', { count: 'exact', head: true })
-          .not('slot_number', 'is', null);
+      // 2. Check team current booked slots count
+      const { data: teamCurrentSlots } = await supabase
+        .from('presentation_slots')
+        .select('id')
+        .eq('team_id', teamId);
 
-        const teamNumber = (count || 0) + 1;
+      const currentCount = teamCurrentSlots?.length || 0;
+      const allowedLimit = teamData.max_slots || getGlobalMaxSlots();
 
-        await supabase
-          .from('presentation_slots')
-          .update({ is_booked: true, team_id: teamId, booked_at: timestamp })
-          .eq('id', slotNumber);
-
-        await supabase
-          .from('teams')
-          .update({ slot_number: slotNumber, team_number: teamNumber, booked_at: timestamp })
-          .eq('id', teamId);
-
+      if (currentCount >= allowedLimit) {
         return {
-          success: true,
-          message: `تم تأكيد الحجز بنجاح! أصبحتم رسمياً: تيم ${teamNumber}`,
-          slot_number: slotNumber,
+          success: false,
+          message: `فريقكم وصل للحد الأقصى المسموح به (${allowedLimit} محميات)`,
         };
       }
 
-      return data as BookingResponse;
+      // 3. Check if target slot is already booked
+      const { data: targetSlot } = await supabase
+        .from('presentation_slots')
+        .select('*')
+        .eq('id', slotNumber)
+        .single();
+
+      if (targetSlot?.is_booked) {
+        return { success: false, message: 'عذراً، هذه المحمية تم حجزها للتو' };
+      }
+
+      // 4. Assign team number if not yet assigned
+      let assignedTeamNumber = teamData.team_number;
+      if (!assignedTeamNumber) {
+        const { count } = await supabase
+          .from('teams')
+          .select('*', { count: 'exact', head: true })
+          .not('team_number', 'is', null);
+        assignedTeamNumber = (count || 0) + 1;
+      }
+
+      // 5. Update slot and team
+      await supabase
+        .from('presentation_slots')
+        .update({ is_booked: true, team_id: teamId, booked_at: timestamp })
+        .eq('id', slotNumber);
+
+      const existingSlotNumbers: number[] = Array.isArray(teamData.slot_numbers)
+        ? teamData.slot_numbers
+        : teamData.slot_number ? [teamData.slot_number] : [];
+
+      const updatedSlotNumbers = Array.from(new Set([...existingSlotNumbers, slotNumber]));
+
+      await supabase
+        .from('teams')
+        .update({
+          slot_numbers: updatedSlotNumbers,
+          slot_number: slotNumber, // legacy
+          team_number: assignedTeamNumber,
+          booked_at: teamData.booked_at || timestamp,
+        })
+        .eq('id', teamId);
+
+      const remainingSlots = allowedLimit - (currentCount + 1);
+
+      return {
+        success: true,
+        message: remainingSlots > 0
+          ? `تم حجز المحمية بنجاح! متبقي لفريقكم حجز ${remainingSlots} محمية إضافية.`
+          : `تم تأكيد حجز المحمية! اكتملت الحصص المخصصة لفريقكم (${allowedLimit} محميات).`,
+        slot_number: slotNumber,
+      };
     } catch (err: unknown) {
       const error = err as Error;
       return { success: false, message: error.message || 'فشل في إتمام عملية الحجز' };
     }
   }
 
-  // Local storage atomic booking
+  // Local storage atomic multi-booking
   const slots = getStoredSlots();
   const teams = getStoredTeams();
 
@@ -74,8 +117,14 @@ export const bookSlot = async (
     return { success: false, message: 'الفريق غير موجود بالنظام' };
   }
 
-  if (team.slot_number) {
-    return { success: false, message: 'الفريق قام بحجز موضوع مسبقاً' };
+  const currentSlots = slots.filter((s) => s.team_id === teamId);
+  const allowedLimit = team.max_slots || getGlobalMaxSlots();
+
+  if (currentSlots.length >= allowedLimit) {
+    return {
+      success: false,
+      message: `فريقكم وصل للحد الأقصى المسموح به (${allowedLimit} محميات)`,
+    };
   }
 
   const slot = slots.find((s) => s.id === slotNumber);
@@ -87,24 +136,33 @@ export const bookSlot = async (
     return { success: false, message: 'عذراً، هذه المحمية تم حجزها للتو' };
   }
 
-  // Calculate chronological team number based on previous bookings
-  const bookedTeamsCount = teams.filter((t) => t.slot_number !== null).length;
-  const assignedTeamNumber = bookedTeamsCount + 1;
+  // Assign team number if this is their first booking
+  if (!team.team_number) {
+    const teamsWithNumber = teams.filter((t) => t.team_number !== null && t.team_number !== undefined);
+    team.team_number = teamsWithNumber.length + 1;
+    team.booked_at = timestamp;
+  }
 
   slot.is_booked = true;
   slot.team_id = teamId;
   slot.booked_at = timestamp;
 
-  team.slot_number = slotNumber;
-  team.team_number = assignedTeamNumber;
-  team.booked_at = timestamp;
+  if (!team.slot_numbers) team.slot_numbers = [];
+  if (!team.slot_numbers.includes(slotNumber)) {
+    team.slot_numbers.push(slotNumber);
+  }
+  team.slot_number = slotNumber; // legacy compatibility
 
   setStoredSlots(slots);
   setStoredTeams(teams);
 
+  const remaining = allowedLimit - (currentSlots.length + 1);
+
   return {
     success: true,
-    message: `تم تأكيد الحجز بنجاح! أصبحتم رسمياً: تيم ${assignedTeamNumber}`,
+    message: remaining > 0
+      ? `تم حجز المحمية بنجاح! متبقي لفريقكم حجز ${remaining} محمية إضافية.`
+      : `تم تأكيد حجز المحمية! اكتملت الحصص المخصصة لفريقكم (${allowedLimit} محميات).`,
     slot_number: slotNumber,
   };
 };
@@ -119,10 +177,22 @@ export const releaseSlot = async (slotNumber: number): Promise<boolean> => {
         .single();
 
       if (slot?.team_id) {
-        await supabase
+        const { data: teamData } = await supabase
           .from('teams')
-          .update({ slot_number: null, team_number: null, booked_at: null })
-          .eq('id', slot.team_id);
+          .select('slot_numbers')
+          .eq('id', slot.team_id)
+          .single();
+
+        if (teamData?.slot_numbers) {
+          const updatedNumbers = (teamData.slot_numbers as number[]).filter((n) => n !== slotNumber);
+          await supabase
+            .from('teams')
+            .update({
+              slot_numbers: updatedNumbers,
+              slot_number: updatedNumbers[0] || null,
+            })
+            .eq('id', slot.team_id);
+        }
       }
 
       await supabase
@@ -143,10 +213,9 @@ export const releaseSlot = async (slotNumber: number): Promise<boolean> => {
 
   if (slot.team_id) {
     const team = teams.find((t) => t.id === slot.team_id);
-    if (team) {
-      team.slot_number = null;
-      team.team_number = null;
-      team.booked_at = null;
+    if (team?.slot_numbers) {
+      team.slot_numbers = team.slot_numbers.filter((n) => n !== slotNumber);
+      team.slot_number = team.slot_numbers[0] || null;
     }
   }
 

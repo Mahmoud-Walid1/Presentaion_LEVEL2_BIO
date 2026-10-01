@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { Trophy, CheckCircle } from 'lucide-react';
+import { Trophy, CheckCircle, ArrowRight } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 
@@ -9,6 +9,8 @@ interface BookingSuccessModalProps {
   slotNumber: number;
   slotTitle?: string;
   teamNumber?: number;
+  bookedCount?: number;
+  allowedLimit?: number;
   onClose: () => void;
 }
 
@@ -16,6 +18,8 @@ export const BookingSuccessModal: React.FC<BookingSuccessModalProps> = ({
   isOpen,
   slotTitle,
   teamNumber,
+  bookedCount = 1,
+  allowedLimit = 2,
   onClose,
 }) => {
   useEffect(() => {
@@ -30,6 +34,7 @@ export const BookingSuccessModal: React.FC<BookingSuccessModalProps> = ({
   }, [isOpen]);
 
   const officialTeamName = teamNumber ? `تيم ${teamNumber}` : 'فريقكم';
+  const hasRemaining = bookedCount < allowedLimit;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="تم تأكيد حجز المحمية" maxWidth="md">
@@ -48,15 +53,26 @@ export const BookingSuccessModal: React.FC<BookingSuccessModalProps> = ({
           <div className="text-3xl sm:text-4xl font-black text-brand-400 mt-1">
             {officialTeamName}
           </div>
+
           {slotTitle && (
             <div className="mt-3 p-3 bg-slate-950 rounded-2xl border border-slate-800 text-xs text-slate-300">
-              <span className="text-slate-400 block mb-0.5">موضوع العرض المعتمد:</span>
+              <span className="text-slate-400 block mb-0.5">المحمية المضافة:</span>
               <strong className="text-sm font-bold text-white block">{slotTitle}</strong>
             </div>
           )}
-          <p className="text-xs text-slate-400 mt-3 max-w-xs mx-auto">
-            تم تثبيت اسم الفريق وترتيبه والمحمية المحددة في النظام اللحظي ولدى لوحة المشرف.
-          </p>
+
+          {/* Progress Banner */}
+          <div className="mt-3 p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-xs text-brand-300 font-semibold">
+            {hasRemaining ? (
+              <span>
+                اكتمل حجز {bookedCount} من {allowedLimit} محميات. يمكنك الآن اختيار المحمية المتبقية.
+              </span>
+            ) : (
+              <span className="text-emerald-300 font-bold">
+                اكتملت حصة فريقكم بالكامل بنجاح ({allowedLimit} من {allowedLimit} محميات).
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="pt-2 border-t border-slate-800">
@@ -64,9 +80,9 @@ export const BookingSuccessModal: React.FC<BookingSuccessModalProps> = ({
             variant="primary"
             className="w-full min-h-[46px] font-bold"
             onClick={onClose}
-            icon={<CheckCircle className="w-4 h-4" />}
+            icon={hasRemaining ? <ArrowRight className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
           >
-            عرض بطاقة الفريق
+            {hasRemaining ? 'متابعة لاختيار المحمية الثانية' : 'عرض بطاقة الفريق'}
           </Button>
         </div>
       </div>
