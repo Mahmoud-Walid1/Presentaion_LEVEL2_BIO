@@ -68,7 +68,7 @@ export const AdminTeamsTable: React.FC<AdminTeamsTableProps> = ({
           {teams.map((team) => {
             const leader = team.members?.find((m) => m.is_leader);
             const isExpanded = expandedTeamId === team.id;
-            const teamLabel = team.team_number ? `تيم ${team.team_number}` : 'في انتظار الحجز';
+            const teamLabel = team.team_number ? `فريق ${team.team_number}` : 'في انتظار الحجز';
             const teamSlots = slots.filter((s) => s.team_id === team.id || (team.slot_numbers && team.slot_numbers.includes(s.id)));
             const allowedLimit = team.max_slots || globalMaxSlots;
 
@@ -225,7 +225,7 @@ export const AdminTeamsTable: React.FC<AdminTeamsTableProps> = ({
               {teams.map((team) => {
                 const leader = team.members?.find((m) => m.is_leader);
                 const isExpanded = expandedTeamId === team.id;
-                const teamLabel = team.team_number ? `تيم ${team.team_number}` : 'في انتظار الحجز';
+                const teamLabel = team.team_number ? `فريق ${team.team_number}` : 'في انتظار الحجز';
                 const teamSlots = slots.filter((s) => s.team_id === team.id || (team.slot_numbers && team.slot_numbers.includes(s.id)));
                 const allowedLimit = team.max_slots || globalMaxSlots;
 
@@ -385,7 +385,7 @@ export const AdminTeamsTable: React.FC<AdminTeamsTableProps> = ({
         <Modal
           isOpen={Boolean(editingLimitTeam)}
           onClose={() => setEditingLimitTeam(null)}
-          title={`تخصيص حد الحجز لـ ${editingLimitTeam.team_number ? `تيم ${editingLimitTeam.team_number}` : 'الفريق'}`}
+          title={`تخصيص حد الحجز لـ ${editingLimitTeam.team_number ? `فريق ${editingLimitTeam.team_number}` : 'الفريق'}`}
           maxWidth="sm"
         >
           <div className="space-y-4 py-2">

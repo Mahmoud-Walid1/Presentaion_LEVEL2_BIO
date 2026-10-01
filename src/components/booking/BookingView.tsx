@@ -48,7 +48,7 @@ export const BookingView: React.FC = () => {
   const remainingCount = Math.max(0, allowedLimit - teamBookedSlots.length);
 
   const officialTeamTitle = activeTeam.team_number
-    ? `تيم ${activeTeam.team_number}`
+    ? `فريق ${activeTeam.team_number}`
     : 'فريق غير محجوز بعد';
 
   const handleInitiateBooking = (slotNumber: number) => {

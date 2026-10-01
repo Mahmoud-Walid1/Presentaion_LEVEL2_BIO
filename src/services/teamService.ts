@@ -107,26 +107,33 @@ export const getTeamByPin = async (pin: string): Promise<Team | null> => {
       const slotNumbers = teamSlots?.map((s) => s.id) || [];
       team.slot_numbers = slotNumbers;
 
-      if (slotNumbers.length > 0 && !team.team_number) {
-        // Calculate chronological team number
-        const { data: allBookedSlots } = await supabase
-          .from('presentation_slots')
-          .select('team_id, booked_at')
-          .not('team_id', 'is', null)
-          .order('booked_at', { ascending: true });
+      // Calculate chronological team number
+      const { data: allTeamsData } = await supabase
+        .from('teams')
+        .select('id')
+        .order('created_at', { ascending: true });
 
-        const uniqueTeamsOrdered: string[] = [];
-        allBookedSlots?.forEach((s) => {
-          if (s.team_id && !uniqueTeamsOrdered.includes(s.team_id)) {
-            uniqueTeamsOrdered.push(s.team_id);
-          }
-        });
+      const { data: allBookedSlots } = await supabase
+        .from('presentation_slots')
+        .select('team_id, booked_at')
+        .not('team_id', 'is', null)
+        .order('booked_at', { ascending: true });
 
-        const rank = uniqueTeamsOrdered.indexOf(team.id);
-        if (rank !== -1) {
-          team.team_number = rank + 1;
+      const uniqueTeamsOrdered: string[] = [];
+      allBookedSlots?.forEach((s) => {
+        if (s.team_id && !uniqueTeamsOrdered.includes(s.team_id)) {
+          uniqueTeamsOrdered.push(s.team_id);
         }
-      }
+      });
+
+      allTeamsData?.forEach((t) => {
+        if (!uniqueTeamsOrdered.includes(t.id)) {
+          uniqueTeamsOrdered.push(t.id);
+        }
+      });
+
+      const rank = uniqueTeamsOrdered.indexOf(team.id);
+      team.team_number = team.team_number || (rank !== -1 ? rank + 1 : 1);
 
       const customLimits = getTeamCustomLimitsMap();
       if (customLimits[team.id] !== undefined) {
@@ -166,6 +173,13 @@ export const getAllTeams = async (): Promise<Team[]> => {
         }
       });
 
+      // Also append registered teams that haven't booked yet in order of registration
+      (data || []).forEach((t) => {
+        if (!uniqueTeamsChronological.includes(t.id)) {
+          uniqueTeamsChronological.push(t.id);
+        }
+      });
+
       const customLimits = getTeamCustomLimitsMap();
 
       return (data || []).map((t) => {
@@ -174,7 +188,7 @@ export const getAllTeams = async (): Promise<Team[]> => {
         return {
           ...t,
           slot_numbers: teamSlots,
-          team_number: t.team_number || (rank !== -1 ? rank + 1 : null),
+          team_number: t.team_number || (rank !== -1 ? rank + 1 : 1),
           max_slots: customLimits[t.id] !== undefined ? customLimits[t.id] : t.max_slots,
         };
       }) as Team[];

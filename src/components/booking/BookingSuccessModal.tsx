@@ -33,7 +33,7 @@ export const BookingSuccessModal: React.FC<BookingSuccessModalProps> = ({
     }
   }, [isOpen]);
 
-  const officialTeamName = teamNumber ? `تيم ${teamNumber}` : 'فريقكم';
+  const officialTeamName = teamNumber ? `فريق ${teamNumber}` : 'فريقكم';
   const hasRemaining = bookedCount < allowedLimit;
 
   return (

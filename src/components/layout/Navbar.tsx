@@ -78,7 +78,7 @@ export const Navbar: React.FC = () => {
                 <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1 text-xs">
                   <CheckCircle className="w-3.5 h-3.5 text-brand-400" />
                   <span className="text-slate-200 font-bold">
-                    {activeTeam.team_number ? `تيم ${activeTeam.team_number}` : 'فريقك'}
+                    {activeTeam.team_number ? `فريق ${activeTeam.team_number}` : 'فريقك'}
                   </span>
                   <button
                     onClick={logoutTeam}

@@ -25,8 +25,14 @@ export const SlotCard: React.FC<SlotCardProps> = ({
   const isBookedByOther = isBooked && !isMySlot;
   const leader = bookedTeam?.members?.find((m) => m.is_leader);
 
-  // Team designation is based on chronological booking rank!
-  const teamLabel = bookedTeam?.team_number ? `تيم ${bookedTeam.team_number}` : 'محجوز';
+  // Team designation is based on chronological booking rank (فريق 1، فريق 2...)
+  const teamNumber = bookedTeam?.team_number;
+  const teamName = teamNumber
+    ? `فريق ${teamNumber}`
+    : bookedTeam
+    ? `فريق (${leader?.full_name || 'مسجل'})`
+    : 'فريق غير محدد';
+  const teamDisplayBadge = isMySlot ? `${teamName} (فريقكم)` : teamName;
 
   return (
     <div
@@ -100,7 +106,7 @@ export const SlotCard: React.FC<SlotCardProps> = ({
                     : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                 }`}
               >
-                {teamLabel}
+                {teamDisplayBadge}
               </span>
             </div>
 
@@ -124,11 +130,11 @@ export const SlotCard: React.FC<SlotCardProps> = ({
         {isMySlot ? (
           <div className="text-center py-2 text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
             <CheckCircle2 className="w-4 h-4" />
-            <span>محمية فريقكم المعتمدة</span>
+            <span>محمية معتمدة لـ {teamName}</span>
           </div>
         ) : isBookedByOther ? (
           <div className="text-center py-2 text-xs text-rose-400/90 font-bold bg-rose-500/5 rounded-xl border border-rose-500/10">
-            تم الحجز بواسطة {teamLabel}
+            تم الحجز بواسطة {teamName}
           </div>
         ) : (
           <Button
