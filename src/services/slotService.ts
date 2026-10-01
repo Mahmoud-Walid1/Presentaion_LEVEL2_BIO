@@ -29,12 +29,17 @@ export const bookSlot = async (
   if (isSupabaseConfigured && supabase) {
     try {
       // 1. Fetch team info
-      const { data: teamData } = await supabase.from('teams').select('*').eq('id', teamId).single();
-      if (!teamData) {
+      const { data: teamData, error: teamErr } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('id', teamId)
+        .single();
+
+      if (teamErr || !teamData) {
         return { success: false, message: 'الفريق غير موجود بالنظام' };
       }
 
-      // 2. Check team current booked slots count
+      // 2. Check team current booked slots count directly from presentation_slots
       const { data: teamCurrentSlots } = await supabase
         .from('presentation_slots')
         .select('id')
@@ -57,41 +62,31 @@ export const bookSlot = async (
         .eq('id', slotNumber)
         .single();
 
-      if (targetSlot?.is_booked) {
-        return { success: false, message: 'عذراً، هذه المحمية تم حجزها للتو' };
+      if (targetSlot?.is_booked && targetSlot.team_id !== teamId) {
+        return { success: false, message: 'عذراً، هذه المحمية تم حجزها للتو من فريق آخر' };
       }
 
-      // 4. Assign team number if not yet assigned
-      let assignedTeamNumber = teamData.team_number;
-      if (!assignedTeamNumber) {
-        const { count } = await supabase
-          .from('teams')
-          .select('*', { count: 'exact', head: true })
-          .not('team_number', 'is', null);
-        assignedTeamNumber = (count || 0) + 1;
-      }
-
-      // 5. Update slot and team
-      await supabase
+      // 4. Update the presentation_slot (Source of Truth)
+      const { error: slotUpdateErr } = await supabase
         .from('presentation_slots')
         .update({ is_booked: true, team_id: teamId, booked_at: timestamp })
         .eq('id', slotNumber);
 
-      const existingSlotNumbers: number[] = Array.isArray(teamData.slot_numbers)
-        ? teamData.slot_numbers
-        : teamData.slot_number ? [teamData.slot_number] : [];
+      if (slotUpdateErr) {
+        return { success: false, message: slotUpdateErr.message || 'فشل في حجز المحمية' };
+      }
 
-      const updatedSlotNumbers = Array.from(new Set([...existingSlotNumbers, slotNumber]));
-
-      await supabase
-        .from('teams')
-        .update({
-          slot_numbers: updatedSlotNumbers,
-          slot_number: slotNumber, // legacy
-          team_number: assignedTeamNumber,
-          booked_at: teamData.booked_at || timestamp,
-        })
-        .eq('id', teamId);
+      // 5. Safely update teams table without throwing if schema columns are optional
+      try {
+        await supabase
+          .from('teams')
+          .update({
+            slot_number: slotNumber,
+          })
+          .eq('id', teamId);
+      } catch {
+        // Ignore column constraint warnings on teams
+      }
 
       const remainingSlots = allowedLimit - (currentCount + 1);
 
@@ -132,7 +127,7 @@ export const bookSlot = async (
     return { success: false, message: 'المحمية المحددة غير صالحة' };
   }
 
-  if (slot.is_booked) {
+  if (slot.is_booked && slot.team_id !== teamId) {
     return { success: false, message: 'عذراً، هذه المحمية تم حجزها للتو' };
   }
 
@@ -151,7 +146,7 @@ export const bookSlot = async (
   if (!team.slot_numbers.includes(slotNumber)) {
     team.slot_numbers.push(slotNumber);
   }
-  team.slot_number = slotNumber; // legacy compatibility
+  team.slot_number = slotNumber;
 
   setStoredSlots(slots);
   setStoredTeams(teams);
@@ -170,31 +165,6 @@ export const bookSlot = async (
 export const releaseSlot = async (slotNumber: number): Promise<boolean> => {
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data: slot } = await supabase
-        .from('presentation_slots')
-        .select('team_id')
-        .eq('id', slotNumber)
-        .single();
-
-      if (slot?.team_id) {
-        const { data: teamData } = await supabase
-          .from('teams')
-          .select('slot_numbers')
-          .eq('id', slot.team_id)
-          .single();
-
-        if (teamData?.slot_numbers) {
-          const updatedNumbers = (teamData.slot_numbers as number[]).filter((n) => n !== slotNumber);
-          await supabase
-            .from('teams')
-            .update({
-              slot_numbers: updatedNumbers,
-              slot_number: updatedNumbers[0] || null,
-            })
-            .eq('id', slot.team_id);
-        }
-      }
-
       await supabase
         .from('presentation_slots')
         .update({ is_booked: false, team_id: null, booked_at: null })

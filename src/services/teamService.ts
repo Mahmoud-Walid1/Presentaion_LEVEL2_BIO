@@ -43,7 +43,7 @@ export const createTeam = async (payload: CreateTeamPayload): Promise<{ success:
 
       return {
         success: true,
-        team: { ...teamData, members: membersData },
+        team: { ...teamData, slot_numbers: [], members: membersData },
       };
     } catch (err: unknown) {
       const error = err as Error;
@@ -75,6 +75,7 @@ export const createTeam = async (payload: CreateTeamPayload): Promise<{ success:
     id: newTeamId,
     pin_code: pin,
     slot_number: null,
+    slot_numbers: [],
     created_at: new Date().toISOString(),
     members,
   };
@@ -95,6 +96,37 @@ export const getTeamByPin = async (pin: string): Promise<Team | null> => {
         .eq('pin_code', cleanPin)
         .single();
       if (error || !team) return null;
+
+      // Enrich with booked slots from presentation_slots
+      const { data: teamSlots } = await supabase
+        .from('presentation_slots')
+        .select('id, booked_at')
+        .eq('team_id', team.id);
+
+      const slotNumbers = teamSlots?.map((s) => s.id) || [];
+      team.slot_numbers = slotNumbers;
+
+      if (slotNumbers.length > 0 && !team.team_number) {
+        // Calculate chronological team number
+        const { data: allBookedSlots } = await supabase
+          .from('presentation_slots')
+          .select('team_id, booked_at')
+          .not('team_id', 'is', null)
+          .order('booked_at', { ascending: true });
+
+        const uniqueTeamsOrdered: string[] = [];
+        allBookedSlots?.forEach((s) => {
+          if (s.team_id && !uniqueTeamsOrdered.includes(s.team_id)) {
+            uniqueTeamsOrdered.push(s.team_id);
+          }
+        });
+
+        const rank = uniqueTeamsOrdered.indexOf(team.id);
+        if (rank !== -1) {
+          team.team_number = rank + 1;
+        }
+      }
+
       return team as Team;
     } catch {
       return null;
@@ -113,7 +145,30 @@ export const getAllTeams = async (): Promise<Team[]> => {
         .select('*, members:team_members(*)')
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return (data || []) as Team[];
+
+      // Fetch all booked slots to map slot_numbers and compute team_number
+      const { data: allSlots } = await supabase
+        .from('presentation_slots')
+        .select('id, team_id, booked_at')
+        .not('team_id', 'is', null)
+        .order('booked_at', { ascending: true });
+
+      const uniqueTeamsChronological: string[] = [];
+      allSlots?.forEach((s) => {
+        if (s.team_id && !uniqueTeamsChronological.includes(s.team_id)) {
+          uniqueTeamsChronological.push(s.team_id);
+        }
+      });
+
+      return (data || []).map((t) => {
+        const teamSlots = allSlots?.filter((s) => s.team_id === t.id).map((s) => s.id) || [];
+        const rank = uniqueTeamsChronological.indexOf(t.id);
+        return {
+          ...t,
+          slot_numbers: teamSlots,
+          team_number: t.team_number || (rank !== -1 ? rank + 1 : null),
+        };
+      }) as Team[];
     } catch {
       return [];
     }
@@ -153,7 +208,6 @@ export const updateTeamMember = async (
 export const deleteTeam = async (teamId: string): Promise<boolean> => {
   if (isSupabaseConfigured && supabase) {
     try {
-      // Free slot if booked
       await supabase.from('presentation_slots').update({ is_booked: false, team_id: null, booked_at: null }).eq('team_id', teamId);
       const { error } = await supabase.from('teams').delete().eq('id', teamId);
       return !error;
@@ -163,17 +217,16 @@ export const deleteTeam = async (teamId: string): Promise<boolean> => {
   }
 
   const teams = getStoredTeams();
-  const targetTeam = teams.find((t) => t.id === teamId);
-  if (targetTeam?.slot_number) {
-    const slots = getStoredSlots();
-    const slot = slots.find((s) => s.id === targetTeam.slot_number);
-    if (slot) {
-      slot.is_booked = false;
-      slot.team_id = null;
-      slot.booked_at = null;
-      setStoredSlots(slots);
+  const slots = getStoredSlots();
+  slots.forEach((s) => {
+    if (s.team_id === teamId) {
+      s.is_booked = false;
+      s.team_id = null;
+      s.booked_at = null;
     }
-  }
+  });
+  setStoredSlots(slots);
+
   const filtered = teams.filter((t) => t.id !== teamId);
   setStoredTeams(filtered);
   return true;
