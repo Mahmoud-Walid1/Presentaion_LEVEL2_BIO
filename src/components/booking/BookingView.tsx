@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { CalendarCheck, UserCheck, AlertTriangle, Compass } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { PresentationSlot } from '../../types/slot';
 import { PinLoginCard } from './PinLoginCard';
 import { SlotGrid } from './SlotGrid';
+import { ConfirmBookingModal } from './ConfirmBookingModal';
 import { BookingSuccessModal } from './BookingSuccessModal';
 import { bookSlot } from '../../services/slotService';
 
 export const BookingView: React.FC = () => {
   const { activeTeam, slots, teams, showToast, refreshData } = useApp();
-  const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
+  const [selectedSlotForConfirm, setSelectedSlotForConfirm] = useState<PresentationSlot | null>(null);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [justBookedSlot, setJustBookedSlot] = useState<number | null>(null);
 
   if (!activeTeam) {
@@ -24,18 +27,27 @@ export const BookingView: React.FC = () => {
     ? `تيم ${activeTeam.team_number}`
     : 'فريق غير محجوز بعد';
 
-  const handleBookSlot = async (slotNumber: number) => {
+  const handleInitiateBooking = (slotNumber: number) => {
     if (hasBooked) {
       showToast('فريقكم قام بحجز محمية مسبقاً بالفعل', 'error');
       return;
     }
 
-    setBookingSlotId(slotNumber);
+    const slot = slots.find((s) => s.id === slotNumber);
+    if (!slot) return;
+    setSelectedSlotForConfirm(slot);
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!selectedSlotForConfirm) return;
+
+    setIsSubmittingBooking(true);
     try {
-      const res = await bookSlot(activeTeam.id, slotNumber);
+      const res = await bookSlot(activeTeam.id, selectedSlotForConfirm.id);
       if (res.success) {
-        setJustBookedSlot(slotNumber);
+        setJustBookedSlot(selectedSlotForConfirm.id);
         showToast(res.message, 'success');
+        setSelectedSlotForConfirm(null);
         await refreshData();
       } else {
         showToast(res.message, 'error');
@@ -43,7 +55,7 @@ export const BookingView: React.FC = () => {
     } catch {
       showToast('حدث خطأ أثناء حجز المحمية', 'error');
     } finally {
-      setBookingSlotId(null);
+      setIsSubmittingBooking(false);
     }
   };
 
@@ -119,17 +131,26 @@ export const BookingView: React.FC = () => {
         </div>
       </div>
 
-      {/* Slots Section */}
+      {/* Slots Grid */}
       <SlotGrid
         slots={slots}
         teams={teams}
         mySlotNumber={activeTeam.slot_number}
         canBook={!hasBooked}
-        bookingSlotId={bookingSlotId}
-        onBookSlot={handleBookSlot}
+        bookingSlotId={selectedSlotForConfirm?.id || null}
+        onBookSlot={handleInitiateBooking}
       />
 
-      {/* Celebration Modal */}
+      {/* Confirmation Modal Before Booking */}
+      <ConfirmBookingModal
+        isOpen={Boolean(selectedSlotForConfirm)}
+        slot={selectedSlotForConfirm}
+        isLoading={isSubmittingBooking}
+        onConfirm={handleConfirmBooking}
+        onClose={() => setSelectedSlotForConfirm(null)}
+      />
+
+      {/* Celebration Modal After Success */}
       {justBookedSlot !== null && (
         <BookingSuccessModal
           isOpen={justBookedSlot !== null}
