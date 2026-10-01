@@ -37,7 +37,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [slots, setSlots] = useState<PresentationSlot[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeam, setActiveTeam] = useState<Team | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('register');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('booking');
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     return localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) === 'true';
   });

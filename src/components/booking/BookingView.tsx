@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CalendarCheck, UserCheck, AlertTriangle, Compass, CheckCircle2 } from 'lucide-react';
+import { CalendarCheck, UserCheck, AlertTriangle, Compass } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { PresentationSlot } from '../../types/slot';
 import { PinLoginCard } from './PinLoginCard';
@@ -14,8 +14,28 @@ export const BookingView: React.FC = () => {
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [justBookedSlot, setJustBookedSlot] = useState<number | null>(null);
 
+  // If no active team is authenticated, show Login/Registration gateway + Live browseable Grid
   if (!activeTeam) {
-    return <PinLoginCard />;
+    const handleUnauthenticatedSlotClick = () => {
+      showToast('يجب تسجيل فريقك أولاً أو إدخال كود الدخول (PIN) للبدء في حجز المحمية', 'info');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    return (
+      <div className="max-w-7xl mx-auto py-4 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-8 animate-fade-in pb-20 md:pb-12">
+        <PinLoginCard />
+
+        <div>
+          <SlotGrid
+            slots={slots}
+            teams={teams}
+            canBook={true}
+            bookingSlotId={null}
+            onBookSlot={handleUnauthenticatedSlotClick}
+          />
+        </div>
+      </div>
+    );
   }
 
   const leader = activeTeam.members?.find((m) => m.is_leader);

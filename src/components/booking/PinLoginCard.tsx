@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { KeyRound, ArrowRight } from 'lucide-react';
+import { KeyRound, ArrowRight, UserPlus, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
 
-export const PinLoginCard: React.FC = () => {
-  const { authenticateByPin, showToast } = useApp();
+interface PinLoginCardProps {
+  onRegisterClick?: () => void;
+}
+
+export const PinLoginCard: React.FC<PinLoginCardProps> = () => {
+  const { authenticateByPin, setActiveTab, showToast } = useApp();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,7 +18,7 @@ export const PinLoginCard: React.FC = () => {
     e.preventDefault();
     const clean = pin.trim();
     if (!clean) {
-      setError('يرجى إدخال رمز الـ PIN');
+      setError('يرجى إدخال رمز الـ PIN الخاص بفريقك');
       return;
     }
     if (clean.length !== 6 || !/^\d+$/.test(clean)) {
@@ -28,28 +32,43 @@ export const PinLoginCard: React.FC = () => {
     setLoading(false);
 
     if (success) {
-      showToast('تم تسجيل الدخول بنجاح', 'success');
+      showToast('تم تسجيل الدخول بنجاح! يمكنك الآن حجز المحميات', 'success');
     } else {
-      setError('رمز الـ PIN غير صحيح أو غير مسجل بالنظام');
-      showToast('رمز الـ PIN غير موجود، تأكد من صحة الكود', 'error');
+      setError('رمز الـ PIN غير مسجل بالنظام، يرجى التأكد أو تسجيل الفريق أولاً');
+      showToast('رمز الـ PIN غير موجود', 'error');
     }
   };
 
   return (
-    <div className="max-w-md mx-auto my-6 sm:my-12 px-4 animate-fade-in">
-      <div className="p-6 sm:p-8 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl">
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-brand-600/10 border border-brand-500/20 flex items-center justify-center text-brand-400 mb-3">
-            <KeyRound className="w-7 h-7" />
-          </div>
-          <h2 className="text-lg sm:text-xl font-bold text-white">تسجيل الدخول لحجز المحمية</h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-            أدخل رمز الـ PIN المكون من 6 أرقام الذي ظهر لك بعد تسجيل أسماء الفريق
+    <div className="p-5 sm:p-7 bg-slate-900/95 border border-slate-800 rounded-3xl shadow-2xl space-y-6">
+      {/* Required Action Alert Banner */}
+      <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs sm:text-sm">
+        <AlertCircle className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
+        <div className="space-y-1">
+          <strong className="block font-bold text-amber-200">
+            تنبيه: يلزم تسجيل الفريق أو إدخال كود الدخول للبدء في الحجز
+          </strong>
+          <p className="text-xs text-amber-300/90 leading-relaxed">
+            لحجز أي محمية، يجب أولاً تسجيل أعضاء الفريق (7 أفراد) للحصول على كود الـ PIN، أو كتابة الكود الخاص بكم إذا كنتم قد سجلتم بالفعل.
           </p>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
+        {/* Option 1: Quick PIN Entry */}
+        <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col justify-between space-y-4">
           <div>
+            <div className="flex items-center gap-2 mb-1.5 text-brand-400">
+              <KeyRound className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">سجلت مسبقاً؟</span>
+            </div>
+            <h3 className="text-base font-extrabold text-white">دخول سريع برمز الـ PIN</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              أدخل الرمز المكون من 6 أرقام الذي ظهر لك بعد إتمام تسجيل الفريق.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
             <Input
               type="tel"
               inputMode="numeric"
@@ -60,24 +79,50 @@ export const PinLoginCard: React.FC = () => {
                 setPin(val);
                 if (error) setError('');
               }}
-              placeholder="••••••"
+              placeholder="مثال: 489210"
               maxLength={6}
-              className="text-center font-mono text-3xl tracking-[0.4em] py-3.5 bg-slate-950"
+              className="text-center font-mono text-2xl tracking-[0.3em] py-2.5 bg-slate-950"
               error={error}
-              autoFocus
             />
+
+            <Button
+              type="submit"
+              size="md"
+              className="w-full min-h-[44px] font-bold"
+              isLoading={loading}
+              icon={<ArrowRight className="w-4 h-4" />}
+            >
+              دخول وبدء حجز المحميات
+            </Button>
+          </form>
+        </div>
+
+        {/* Option 2: Register New Team */}
+        <div className="p-5 rounded-2xl bg-brand-950/20 border border-brand-500/30 flex flex-col justify-between space-y-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5 text-brand-400">
+              <UserPlus className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">فريق جديد</span>
+            </div>
+            <h3 className="text-base font-extrabold text-white">ليس لديك فريق مسجل بعد؟</h3>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              قم بتسجيل قائد الفريق وأسماء الأعضاء الستة (7 أفراد) في خطوة واحدة للحصول فوراً على كود الـ PIN الخاص بكم.
+            </p>
           </div>
 
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full h-12 text-sm sm:text-base font-bold shadow-brand-500/20"
-            isLoading={loading}
-            icon={<ArrowRight className="w-5 h-5" />}
-          >
-            دخول واختيار المحمية
-          </Button>
-        </form>
+          <div className="pt-2">
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              className="w-full min-h-[44px] font-extrabold bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-lg shadow-brand-500/25"
+              onClick={() => setActiveTab('register')}
+              icon={<UserPlus className="w-5 h-5" />}
+            >
+              تسجيل فريقك الآن (7 أفراد)
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
