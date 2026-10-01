@@ -21,7 +21,7 @@ export const SlotCard: React.FC<SlotCardProps> = ({
   isBooking,
   onBook,
 }) => {
-  const isBooked = slot.is_booked || Boolean(bookedTeam);
+  const isBooked = Boolean(slot.is_booked);
   const isBookedByOther = isBooked && !isMySlot;
   const leader = bookedTeam?.members?.find((m) => m.is_leader);
 

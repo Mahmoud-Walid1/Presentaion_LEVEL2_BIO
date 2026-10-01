@@ -129,10 +129,20 @@ export const SlotGrid: React.FC<SlotGridProps> = ({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredSlots.map((slot) => {
-            const bookedTeam = teams.find(
-              (t) => t.id === slot.team_id || (t.slot_numbers && t.slot_numbers.includes(slot.id)) || t.slot_number === slot.id
+            const isBooked = Boolean(slot.is_booked);
+            const bookedTeam = isBooked
+              ? teams.find(
+                  (t) =>
+                    t.id === slot.team_id ||
+                    (t.slot_numbers && t.slot_numbers.includes(slot.id))
+                )
+              : undefined;
+            const isMySlot = Boolean(
+              isBooked &&
+                activeTeam &&
+                (slot.team_id === activeTeam.id ||
+                  activeTeam.slot_numbers?.includes(slot.id))
             );
-            const isMySlot = Boolean(activeTeam && (slot.team_id === activeTeam.id || activeTeam.slot_numbers?.includes(slot.id)));
 
             return (
               <SlotCard

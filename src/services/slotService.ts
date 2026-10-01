@@ -159,6 +159,15 @@ export const releaseSlot = async (slotNumber: number): Promise<boolean> => {
         .update({ is_booked: false, team_id: null, booked_at: null })
         .eq('id', slotNumber);
 
+      try {
+        await supabase
+          .from('teams')
+          .update({ slot_number: null })
+          .eq('slot_number', slotNumber);
+      } catch {
+        // Optional
+      }
+
       return true;
     } catch {
       return false;

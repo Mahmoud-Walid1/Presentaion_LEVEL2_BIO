@@ -102,7 +102,8 @@ export const getTeamByPin = async (pin: string): Promise<Team | null> => {
       const { data: teamSlots } = await supabase
         .from('presentation_slots')
         .select('id, booked_at')
-        .eq('team_id', team.id);
+        .eq('team_id', team.id)
+        .eq('is_booked', true);
 
       const slotNumbers = teamSlots?.map((s) => s.id) || [];
       team.slot_numbers = slotNumbers;
@@ -163,6 +164,7 @@ export const getAllTeams = async (): Promise<Team[]> => {
       const { data: allSlots } = await supabase
         .from('presentation_slots')
         .select('id, team_id, booked_at')
+        .eq('is_booked', true)
         .not('team_id', 'is', null)
         .order('booked_at', { ascending: true });
 
