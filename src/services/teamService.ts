@@ -1,6 +1,7 @@
 import { Team, TeamMember, CreateTeamPayload } from '../types/team';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getStoredTeams, setStoredTeams, getStoredSlots, setStoredSlots } from '../lib/storage';
+import { getTeamCustomLimitsMap } from './settingsService';
 
 export const generatePinCode = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -127,6 +128,11 @@ export const getTeamByPin = async (pin: string): Promise<Team | null> => {
         }
       }
 
+      const customLimits = getTeamCustomLimitsMap();
+      if (customLimits[team.id] !== undefined) {
+        team.max_slots = customLimits[team.id];
+      }
+
       return team as Team;
     } catch {
       return null;
@@ -160,6 +166,8 @@ export const getAllTeams = async (): Promise<Team[]> => {
         }
       });
 
+      const customLimits = getTeamCustomLimitsMap();
+
       return (data || []).map((t) => {
         const teamSlots = allSlots?.filter((s) => s.team_id === t.id).map((s) => s.id) || [];
         const rank = uniqueTeamsChronological.indexOf(t.id);
@@ -167,6 +175,7 @@ export const getAllTeams = async (): Promise<Team[]> => {
           ...t,
           slot_numbers: teamSlots,
           team_number: t.team_number || (rank !== -1 ? rank + 1 : null),
+          max_slots: customLimits[t.id] !== undefined ? customLimits[t.id] : t.max_slots,
         };
       }) as Team[];
     } catch {

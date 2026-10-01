@@ -2,7 +2,7 @@ import { PresentationSlot, BookingResponse } from '../types/slot';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getStoredSlots, setStoredSlots, getStoredTeams, setStoredTeams } from '../lib/storage';
 import { INITIAL_SLOTS } from '../constants/defaults';
-import { getGlobalMaxSlots } from './settingsService';
+import { getGlobalMaxSlots, getTeamCustomLimitsMap } from './settingsService';
 
 export const getAllSlots = async (): Promise<PresentationSlot[]> => {
   if (isSupabaseConfigured && supabase) {
@@ -46,7 +46,8 @@ export const bookSlot = async (
         .eq('team_id', teamId);
 
       const currentCount = teamCurrentSlots?.length || 0;
-      const allowedLimit = teamData.max_slots || getGlobalMaxSlots();
+      const customLimits = getTeamCustomLimitsMap();
+      const allowedLimit = customLimits[teamId] ?? teamData.max_slots ?? getGlobalMaxSlots();
 
       if (currentCount >= allowedLimit) {
         return {
@@ -74,18 +75,6 @@ export const bookSlot = async (
 
       if (slotUpdateErr) {
         return { success: false, message: slotUpdateErr.message || 'فشل في حجز المحمية' };
-      }
-
-      // 5. Safely update teams table without throwing if schema columns are optional
-      try {
-        await supabase
-          .from('teams')
-          .update({
-            slot_number: slotNumber,
-          })
-          .eq('id', teamId);
-      } catch {
-        // Ignore column constraint warnings on teams
       }
 
       const remainingSlots = allowedLimit - (currentCount + 1);
