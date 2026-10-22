@@ -34,6 +34,7 @@ d:/مشروع محمد/
     │   ├── supabase.ts          # تهيئة عميل Supabase وفحص حالة الاتصال
     │   ├── storage.ts           # محرك المزامنة اللحظية المحلي عبر BroadcastChannel
     │   └── export.ts            # أداة تصدير كشوفات الحضور والأدوار إلى CSV/Excel
+    │   └── findSlotTeam.ts      # تحديد الفريق الحاجز لمحمية (team_id / slot_numbers) وتسمية "فريق N"
     ├── services/
     │   ├── teamService.ts       # عمليات إنشاء الفرق، استعلام الـ PIN، والتعديل
     │   └── slotService.ts       # عمليات حجز الأدوار، تفريغها، وتصفير البيانات

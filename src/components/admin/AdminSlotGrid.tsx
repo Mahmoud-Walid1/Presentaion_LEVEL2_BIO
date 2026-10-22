@@ -3,6 +3,7 @@ import { CheckCircle2, Unlock, Compass, Search } from 'lucide-react';
 import { PresentationSlot } from '../../types/slot';
 import { Team } from '../../types/team';
 import { Button } from '../common/Button';
+import { findSlotTeam, getTeamLabel } from '../../lib/findSlotTeam';
 
 interface AdminSlotGridProps {
   slots: PresentationSlot[];
@@ -44,7 +45,7 @@ export const AdminSlotGrid: React.FC<AdminSlotGridProps> = ({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {filteredSlots.map((slot) => {
-          const bookedTeam = teams.find((t) => t.slot_number === slot.id);
+          const bookedTeam = findSlotTeam(slot, teams);
           const isBooked = slot.is_booked || Boolean(bookedTeam);
           const leader = bookedTeam?.members?.find((m) => m.is_leader);
 
@@ -80,7 +81,7 @@ export const AdminSlotGrid: React.FC<AdminSlotGridProps> = ({
                   {isBooked ? (
                     <div className="bg-slate-950/70 p-1.5 rounded-lg border border-slate-800/60">
                       <span className="text-brand-300 font-extrabold block">
-                        تيم {slot.id}
+                        {getTeamLabel(bookedTeam)}
                       </span>
                       <span className="block text-[10px] text-slate-400 truncate">
                         الليدر: {leader?.full_name || '—'}
